@@ -1,0 +1,91 @@
+{
+    "$schema": "https://mintlify.com/docs.json",
+    "theme": "mint",
+    "name": "Rowboat",
+    "description": "Rowboat is an open-source platform for building multi-agent systems. It helps you orchestrate tools, RAG, memory, and deployable agents with ease.",
+    "colors": {
+      "primary": "#6366F1",
+      "light": "#F3F4F6",
+      "dark": "#111827"
+    },
+    "navigation": {
+      "anchors": [
+        {
+          "anchor": "Documentation",
+          "icon": "book-open",
+          "tabs": [
+            {
+              "tab": "Docs",
+              "groups": [
+                {
+                  "group": "Getting Started",
+                  "icon": "rocket",
+                  "pages": ["docs/setup"]
+                },
+                {
+                  "group": "Overview",
+                  "icon": "info-circle",
+                  "pages": ["docs/index", "docs/license"]
+                },
+                {
+                  "group": "Building in Studio",
+                  "icon": "toolbox",
+                  "pages": [
+                    "docs/create_agents",
+                    "docs/playground",
+                    "docs/add_tools",
+                    "docs/update_agents",
+                    "docs/using_rag"
+                  ]
+                },
+                {
+                  "group": "API & SDK",
+                  "icon": "code",
+                  "pages": ["docs/using_the_api", "docs/using_the_sdk"]
+                },
+                {
+                  "group": "Concepts",
+                  "icon": "lightbulb",
+                  "pages": ["docs/agents", "docs/tools", "docs/prompts"]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "anchor": "Website",
+          "href": "https://www.rowboatlabs.com",
+          "icon": "window"
+        },
+        {
+          "anchor": "GitHub",
+          "href": "https://github.com/rowboatlabs/rowboat",
+          "icon": "github"
+        },
+        {
+          "anchor": "Discord",
+          "href": "https://discord.gg/YOUR_INVITE",
+          "icon": "discord"
+        }
+      ]
+    },
+    "background": {
+      "color": {
+        "light": "#FFFFFF",
+        "dark": "#0F172A"
+      }
+    },
+    "navbar": {
+      "primary": {
+        "type": "button",
+        "label": "Try Rowboat",
+        "href": "https://app.rowboatlabs.com"
+      }
+    },
+    "footer": {
+      "socials": {
+        "github": "https://github.com/rowboatlabs/rowboat",
+        "linkedin": "https://www.linkedin.com/company/rowboat-labs"
+      }
+    }
+  }

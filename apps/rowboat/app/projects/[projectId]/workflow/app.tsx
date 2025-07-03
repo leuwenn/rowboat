@@ -9,7 +9,8 @@ import { WorkflowSelector } from "./workflow_selector";
 import { Spinner } from "@heroui/react";
 import { cloneWorkflow, createWorkflow, fetchPublishedWorkflowId, fetchWorkflow } from "../../../actions/workflow_actions";
 import { listDataSources } from "../../../actions/datasource_actions";
-import { listMcpServers, listProjectMcpTools } from "@/app/actions/mcp_actions";
+import { listMcpServers } from "@/app/actions/mcp_actions";
+import { collectProjectTools } from "@/app/actions/project_actions";
 import { getProjectConfig } from "@/app/actions/project_actions";
 import { WorkflowTool } from "@/app/lib/types/workflow_types";
 import { getEligibleModels } from "@/app/actions/billing_actions";
@@ -51,7 +52,7 @@ export function App({
             listDataSources(projectId),
             listMcpServers(projectId),
             getProjectConfig(projectId),
-            listProjectMcpTools(projectId),
+            collectProjectTools(projectId),
             getEligibleModels(),
         ]);
 

@@ -296,37 +296,6 @@ export async function getSelectedMcpTools(projectId: string, serverName: string)
     return server.tools.map(t => t.id);
 }
 
-export async function listProjectMcpTools(projectId: string): Promise<z.infer<typeof WorkflowTool>[]> {
-    await projectAuthCheck(projectId);
-    
-    try {
-        // Get project's MCP servers and their tools
-        const project = await projectsCollection.findOne({ _id: projectId });
-        if (!project?.mcpServers) return [];
-
-        // Convert MCP tools to workflow tools format, but only from ready servers
-        return project.mcpServers
-            .filter(server => server.isReady) // Only include tools from ready servers
-            .flatMap(server => {
-                return server.tools.map(tool => ({
-                    name: tool.name,
-                    description: tool.description || "",
-                    parameters: {
-                        type: 'object' as const,
-                        properties: tool.parameters?.properties || {},
-                        required: tool.parameters?.required || []
-                    },
-                    isMcp: true,
-                    mcpServerName: server.name,
-                    mcpServerURL: server.serverUrl,
-                }));
-            });
-    } catch (error) {
-        console.error('Error fetching project tools:', error);
-        return [];
-    }
-}
-
 export async function testMcpTool(
     projectId: string,
     serverName: string, 

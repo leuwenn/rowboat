@@ -6,11 +6,12 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { CoreMessage, embed, generateText } from "ai";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
+import { Composio } from '@composio/core';
 
 // Internal dependencies
 import { embeddingModel } from '../lib/embedding';
 import { getMcpClient } from "./mcp";
-import { dataSourceDocsCollection, dataSourcesCollection } from "./mongodb";
+import { dataSourceDocsCollection, dataSourcesCollection, projectsCollection } from "./mongodb";
 import { qdrantClient } from '../lib/qdrant';
 import { EmbeddingRecord } from "./types/datasource_types";
 import { ConnectedEntity, sanitizeTextWithMentions, Workflow, WorkflowAgent, WorkflowPrompt, WorkflowTool } from "./types/workflow_types";
@@ -192,6 +193,44 @@ async function invokeMcpTool(
     return result;
 }
 
+// Helper to handle composio tool calls
+async function invokeComposioTool(
+    logger: PrefixLogger,
+    projectId: string,
+    name: string,
+    composioData: z.infer<typeof WorkflowTool>['composioData'] & {},
+    input: any,
+) {
+    logger = logger.child(`invokeComposioTool`);
+    logger.log(`projectId: ${projectId}`);
+    logger.log(`name: ${name}`);
+    logger.log(`input: ${JSON.stringify(input)}`);
+
+    const { slug, toolkitSlug, noAuth } = composioData;
+
+    let connectedAccountId: string | undefined = undefined;
+    if (!noAuth) {
+        const project = await projectsCollection.findOne({ _id: projectId });
+        if (!project) {
+            throw new Error(`project ${projectId} not found`);
+        }
+        connectedAccountId = project.composioConnectedAccounts?.[toolkitSlug]?.id;
+        if (!connectedAccountId) {
+            throw new Error(`connected account id not found for project ${projectId} and toolkit ${toolkitSlug}`);
+        }
+    }
+
+    const composio = new Composio();
+
+    const result = await composio.tools.execute(slug, {
+        userId: projectId,
+        arguments: input,
+        connectedAccountId: connectedAccountId,
+    });
+    logger.log(`composio tool result: ${JSON.stringify(result)}`);
+    return result.data;
+}
+
 // Helper to create RAG tool
 function createRagTool(
     logger: PrefixLogger,
@@ -283,6 +322,44 @@ function createMcpTool(
                 });
             } catch (error) {
                 logger.log(`Error executing mcp tool ${name}:`, error);
+                return JSON.stringify({
+                    error: `Tool execution failed: ${error}`,
+                });
+            }
+        }
+    });
+}
+
+// Helper to create a composio tool
+function createComposioTool(
+    logger: PrefixLogger,
+    config: z.infer<typeof WorkflowTool>,
+    projectId: string
+): Tool {
+    const { name, description, parameters, composioData } = config;
+
+    if (!composioData) {
+        throw new Error(`composio data not found for tool ${name}`);
+    }
+
+    return tool({
+        name,
+        description,
+        strict: false,
+        parameters: {
+            type: 'object',
+            properties: parameters.properties,
+            required: parameters.required || [],
+            additionalProperties: true,
+        },
+        async execute(input: any) {
+            try {
+                const result = await invokeComposioTool(logger, projectId, name, composioData, input);
+                return JSON.stringify({
+                    result,
+                });
+            } catch (error) {
+                logger.log(`Error executing composio tool ${name}:`, error);
                 return JSON.stringify({
                     error: `Tool execution failed: ${error}`,
                 });
@@ -593,6 +670,9 @@ function createTools(logger: PrefixLogger, workflow: z.infer<typeof Workflow>, t
         if (config.isMcp) {
             tools[toolName] = createMcpTool(logger, config, workflow.projectId);
             logger.log(`created mcp tool: ${toolName}`);
+        } else if (config.isComposio) {
+            tools[toolName] = createComposioTool(logger, config, workflow.projectId);
+            logger.log(`created composio tool: ${toolName}`);
         } else if (config.mockTool) {
             tools[toolName] = createMockTool(logger, config);
             logger.log(`created mock tool: ${toolName}`);

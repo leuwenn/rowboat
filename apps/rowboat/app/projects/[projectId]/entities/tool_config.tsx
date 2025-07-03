@@ -170,7 +170,7 @@ export function ToolConfig({
     });
 
     const [selectedParams, setSelectedParams] = useState(new Set([]));
-    const isReadOnly = tool.isMcp || tool.isLibrary;
+    const isReadOnly = tool.isMcp || tool.isLibrary || tool.isComposio;
     const [nameError, setNameError] = useState<string | null>(null);
 
     // Log when parameters are being rendered

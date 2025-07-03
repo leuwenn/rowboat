@@ -204,6 +204,13 @@ const ServerCard = ({
     );
 };
 
+type ComposioToolkit = {
+    slug: string;
+    name: string;
+    logo: string;
+    tools: z.infer<typeof WorkflowTool>[];
+}
+
 export function EntityList({
     agents,
     tools,
@@ -233,6 +240,22 @@ export function EntityList({
     const selectedRef = useRef<HTMLButtonElement | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [containerHeight, setContainerHeight] = useState<number>(0);
+
+    // collect composio tools
+    const composioTools: Record<string, ComposioToolkit> = {};
+    for (const tool of mergedTools) {
+        if (tool.isComposio) {
+            if (!composioTools[tool.composioData?.toolkitSlug || '']) {
+                composioTools[tool.composioData?.toolkitSlug || ''] = {
+                    name: tool.composioData?.toolkitName || '',
+                    slug: tool.composioData?.toolkitSlug || '',
+                    logo: tool.composioData?.logo || '',
+                    tools: []
+                };
+            }
+            composioTools[tool.composioData?.toolkitSlug || ''].tools.push(tool);
+        }
+    }
 
     // Panel expansion states
     const [expandedPanels, setExpandedPanels] = useState({
@@ -469,7 +492,7 @@ export function EntityList({
                                             {/* Group tools by server */}
                                             {(() => {
                                                 // Get custom tools (non-MCP tools)
-                                                const customTools = mergedTools.filter(tool => !tool.isMcp);
+                                                const customTools = mergedTools.filter(tool => !tool.isMcp && !tool.isComposio);
                                                 
                                                 // Group MCP tools by server
                                                 const serverTools = mergedTools.reduce((acc, tool) => {
@@ -484,7 +507,19 @@ export function EntityList({
 
                                                 return (
                                                     <>
-                                                        {/* Show MCP server cards first */}
+                                                        {/* Show composio cards */}
+                                                        {Object.values(composioTools).map((card) => (
+                                                            <ComposioCard 
+                                                                key={card.slug} 
+                                                                card={card}
+                                                                selectedEntity={selectedEntity}
+                                                                onSelectTool={handleToolSelection}
+                                                                onDeleteTool={onDeleteTool}
+                                                                selectedRef={selectedRef}
+                                                            />
+                                                        ))}
+
+                                                        {/* Show MCP server cards */}
                                                         {Object.entries(serverTools).map(([serverName, tools]) => (
                                                             <ServerCard
                                                                 key={serverName}
@@ -689,6 +724,96 @@ function EntityDropdown({
         </Dropdown>
     );
 }
+
+interface ComposioCardProps {
+    card: ComposioToolkit;
+    selectedEntity: {
+        type: "agent" | "tool" | "prompt";
+        name: string;
+    } | null;
+    onSelectTool: (name: string) => void;
+    onDeleteTool: (name: string) => void;
+    selectedRef: React.RefObject<HTMLButtonElement | null>;
+}
+
+const ComposioCard = ({
+    card,
+    selectedEntity,
+    onSelectTool,
+    onDeleteTool,
+    selectedRef,
+}: ComposioCardProps) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+
+    return (
+        <div className="mb-2">
+            <button
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-md text-sm text-left"
+            >
+                {isExpanded ? (
+                    <ChevronDown className="w-4 h-4 text-gray-500" />
+                ) : (
+                    <ChevronRight className="w-4 h-4 text-gray-500" />
+                )}
+                <div className="flex items-center gap-1">
+                    {card.logo ? (
+                        <div className="relative w-4 h-4">
+                            <img
+                                src={card.logo}
+                                alt={`${card.name} logo`}
+                                className="w-full h-full object-contain rounded"
+                                onError={(e) => {
+                                    e.currentTarget.style.display = 'none';
+                                }}
+                            />
+                        </div>
+                    ) : (
+                        <ImportIcon className="w-4 h-4 text-blue-600 dark:text-blue-500" />
+                    )}
+                    <span>{card.name}</span>
+                </div>
+            </button>
+            {isExpanded && (
+                <div className="ml-6 mt-1 space-y-1">
+                    {card.tools.map((tool, index) => (
+                        <ListItemWithMenu
+                            key={`composio-tool-${index}`}
+                            name={tool.name}
+                            isSelected={selectedEntity?.type === "tool" && selectedEntity.name === tool.name}
+                            onClick={() => onSelectTool(tool.name)}
+                            disabled={tool.isLibrary}
+                            selectedRef={selectedEntity?.type === "tool" && selectedEntity.name === tool.name ? selectedRef : undefined}
+                            icon={
+                                card.logo ? (
+                                    <div className="relative w-4 h-4">
+                                        <img
+                                            src={card.logo}
+                                            alt={`${card.name} logo`}
+                                            className="w-full h-full object-contain rounded"
+                                            onError={(e) => {
+                                                e.currentTarget.style.display = 'none';
+                                            }}
+                                        />
+                                    </div>
+                                ) : (
+                                    <ImportIcon className="w-4 h-4 text-blue-600 dark:text-blue-500" />
+                                )
+                            }
+                            menuContent={
+                                <EntityDropdown 
+                                    name={tool.name} 
+                                    onDelete={onDeleteTool}
+                                    isLocked={tool.isComposio}
+                                />
+                            }
+                        />
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
 
 // Add SortableItem component for agents
 const SortableAgentItem = ({ agent, isSelected, onClick, selectedRef, statusLabel, onToggle, onSetMainAgent, onDelete, isStartAgent }: {

@@ -7,7 +7,7 @@ import { ApiRequest, ApiResponse } from "../../../../lib/types/types";
 import { check_query_limit } from "../../../../lib/rate_limiting";
 import { PrefixLogger } from "../../../../lib/utils";
 import { TestProfile } from "@/app/lib/types/testing_types";
-import { fetchProjectMcpTools } from "@/app/lib/project_tools";
+import { collectProjectTools } from "@/app/lib/project_tools";
 import { authorize, getCustomerIdForProject, logUsage } from "@/app/lib/billing";
 import { USE_BILLING } from "@/app/lib/feature_flags";
 import { getResponse } from "@/app/lib/agents";
@@ -62,7 +62,7 @@ export async function POST(
         }
 
         // fetch project tools
-        const projectTools = await fetchProjectMcpTools(projectId);
+        const projectTools = await collectProjectTools(projectId);
 
         // if workflow id is provided in the request, use it, else use the published workflow id
         let workflowId = result.data.workflowId ?? project.publishedWorkflowId;

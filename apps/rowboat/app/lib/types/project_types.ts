@@ -1,6 +1,18 @@
 import { z } from "zod";
 import { MCPServer } from "./types";
 import { WorkflowTool } from "./workflow_types";
+import { ZTool } from "../composio/composio";
+
+export const ComposioConnectedAccount = z.object({
+    id: z.string(),
+    status: z.enum([
+        'INITIATED',
+        'ACTIVE',
+        'FAILED',
+    ]),
+    createdAt: z.string().datetime(),
+    lastUpdatedAt: z.string().datetime(),
+});
 
 export const Project = z.object({
     _id: z.string().uuid(),
@@ -15,6 +27,8 @@ export const Project = z.object({
     nextWorkflowNumber: z.number().optional(),
     testRunCounter: z.number().default(0),
     mcpServers: z.array(MCPServer).optional(),
+    composioConnectedAccounts: z.record(z.string(), ComposioConnectedAccount).optional(),
+    composioSelectedTools: z.array(ZTool).optional(),
 });
 
 export const ProjectMember = z.object({
@@ -38,32 +52,11 @@ export function mergeProjectTools(
     // Filter out any existing MCP tools from workflow tools
     const nonMcpTools = workflowTools.filter(t => !t.isMcp);
 
-    // Merge with MCP tools
+    // Merge with project tools
     const merged = [
         ...nonMcpTools,
-        ...projectTools.map(tool => ({
-            ...tool,
-            isMcp: true as const, // Ensure isMcp is set
-            parameters: {
-                type: 'object' as const,
-                properties: tool.parameters?.properties || {},
-                required: tool.parameters?.required || []
-            }
-        }))
+        ...projectTools
     ];
-
-    console.log('[mergeMcpTools] Merged tools:', {
-        totalCount: merged.length,
-        nonMcpCount: nonMcpTools.length,
-        mcpCount: projectTools.length,
-        tools: merged.map(t => ({
-            name: t.name,
-            isMcp: t.isMcp,
-            hasParams: !!t.parameters,
-            paramCount: t.parameters ? Object.keys(t.parameters.properties).length : 0,
-            parameters: t.parameters
-        }))
-    });
 
     return merged;
 }

@@ -51,6 +51,14 @@ export const WorkflowTool = z.object({
     isLibrary: z.boolean().default(false).optional(),
     mcpServerName: z.string().optional(),
     mcpServerURL: z.string().optional(),
+    isComposio: z.boolean().optional(), // whether this is a Composio tool
+    composioData: z.object({
+        slug: z.string(), // the slug for the Composio tool e.g. "GITHUB_CREATE_AN_ISSUE"
+        noAuth: z.boolean(), // whether the tool requires no authentication
+        toolkitName: z.string(), // the name for the Composio toolkit e.g. "GITHUB"
+        toolkitSlug: z.string(), // the slug for the Composio toolkit e.g. "GITHUB"
+        logo: z.string(), // the logo for the Composio tool
+    }).optional(), // the data for the Composio tool, if it is a Composio tool
 });
 export const Workflow = z.object({
     name: z.string().optional(),

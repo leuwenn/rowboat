@@ -4,10 +4,11 @@ import { useState } from 'react';
 import { Tabs, Tab } from '@/components/ui/tabs';
 import { HostedServers } from './HostedServers';
 import { CustomServers } from './CustomServers';
+import { Composio } from './Composio';
 import type { Key } from 'react';
 
-export function ToolsConfig() {
-  const [activeTab, setActiveTab] = useState('hosted');
+export function ToolsConfig({ useComposioTools }: { useComposioTools: boolean }) {
+  const [activeTab, setActiveTab] = useState(useComposioTools ? 'composio' : 'hosted');
 
   const handleTabChange = (key: Key) => {
     setActiveTab(key.toString());
@@ -22,6 +23,13 @@ export function ToolsConfig() {
         className="w-full"
         fullWidth
       >
+        {useComposioTools && (
+          <Tab key="composio" title="Composio">
+            <div className="mt-4 p-6">
+              <Composio />
+            </div>
+          </Tab>
+        )}
         <Tab key="hosted" title={
           <div className="flex items-center gap-2">
             <span>Tools Library</span>

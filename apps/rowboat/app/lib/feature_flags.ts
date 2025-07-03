@@ -6,6 +6,7 @@ export const USE_AUTH = process.env.USE_AUTH === 'true';
 export const USE_RAG_S3_UPLOADS = process.env.USE_RAG_S3_UPLOADS === 'true';
 export const USE_GEMINI_FILE_PARSING = process.env.USE_GEMINI_FILE_PARSING === 'true';
 export const USE_BILLING = process.env.USE_BILLING === 'true';
+export const USE_COMPOSIO_TOOLS = process.env.USE_COMPOSIO_TOOLS === 'true';
 
 // Hardcoded flags
 export const USE_MULTIPLE_PROJECTS = true;

@@ -2,50 +2,59 @@ import { z } from "zod";
 import { projectsCollection } from "./mongodb";
 import { WorkflowTool } from "./types/workflow_types";
 
-export async function fetchProjectMcpTools(projectId: string): Promise<z.infer<typeof WorkflowTool>[]> {
-    // Get project's MCP servers and their tools
-    const project = await projectsCollection.findOne({ _id: projectId });
-    if (!project?.mcpServers) return [];
+export async function collectProjectTools(projectId: string): Promise<z.infer<typeof WorkflowTool>[]> {
+    const tools: z.infer<typeof WorkflowTool>[] = [];
 
-    console.log('[MCP] Getting tools from project:', {
-        serverCount: project.mcpServers.length,
-        servers: project.mcpServers.map(s => ({
-            name: s.name,
-            isReady: s.isReady,
-            toolCount: s.tools.length,
-            tools: s.tools.map(t => ({
-                name: t.name,
-                hasParams: !!t.parameters,
-                paramCount: t.parameters ? Object.keys(t.parameters.properties).length : 0,
-                required: t.parameters?.required || []
-            }))
-        }))
-    });
+    // Get project data
+    const project = await projectsCollection.findOne({ _id: projectId });
+    if (!project) {
+        throw new Error(`Project ${projectId} not found`);
+    }
 
     // Convert MCP tools to workflow tools format, but only from ready servers
-    const mcpTools = project.mcpServers
-        .filter(server => server.isReady) // Only include tools from ready servers
-        .flatMap(server => {
-            return server.tools.map(tool => ({
-                name: tool.name,
+    if (project.mcpServers) {
+        for (const server of project.mcpServers) {
+            if (server.isReady) {
+                for (const tool of server.tools) {
+                    tools.push({
+                        name: tool.name,
+                        description: tool.description || "",
+                        parameters: {
+                            type: 'object' as const,
+                            properties: tool.parameters?.properties || {},
+                            required: tool.parameters?.required || []
+                        },
+                        isMcp: true,
+                        mcpServerName: server.name,
+                        mcpServerURL: server.serverUrl,
+                    });
+                }
+            }
+        }
+    }
+
+    // Add Composio tools
+    if (project.composioSelectedTools) {
+        for (const tool of project.composioSelectedTools) {
+            tools.push({
+                name: tool.slug,
                 description: tool.description || "",
                 parameters: {
                     type: 'object' as const,
-                    properties: tool.parameters?.properties || {},
-                    required: tool.parameters?.required || []
+                    properties: tool.input_parameters?.properties || {},
+                    required: tool.input_parameters?.required || []
                 },
-                isMcp: true,
-                mcpServerName: server.name,
-                mcpServerURL: server.serverUrl,
-            }));
-        });
+                isComposio: true,
+                composioData: {
+                    slug: tool.slug,
+                    noAuth: tool.no_auth,
+                    toolkitName: tool.toolkit.name,
+                    toolkitSlug: tool.toolkit.slug,
+                    logo: tool.toolkit.logo,
+                },
+            });
+        }
+    }
 
-    console.log('[MCP] Converted tools from ready servers:', mcpTools.map(t => ({
-        name: t.name,
-        hasParams: !!t.parameters,
-        paramCount: t.parameters ? Object.keys(t.parameters.properties).length : 0,
-        required: t.parameters?.required || []
-    })));
-
-    return mcpTools;
+    return tools;
 }

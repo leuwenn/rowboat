@@ -11,7 +11,7 @@ import { check_query_limit } from "../lib/rate_limiting";
 import { QueryLimitError } from "../lib/client_utils";
 import { projectAuthCheck } from "./project_actions";
 import { redisClient } from "../lib/redis";
-import { fetchProjectMcpTools } from "../lib/project_tools";
+import { collectProjectTools } from "../lib/project_tools";
 import { mergeProjectTools } from "../lib/types/project_types";
 import { authorizeUserAction, logUsage } from "./billing_actions";
 import { USE_BILLING } from "../lib/feature_flags";
@@ -46,12 +46,12 @@ export async function getCopilotResponseStream(
     }
 
     // Get MCP tools from project and merge with workflow tools
-    const mcpTools = await fetchProjectMcpTools(projectId);
+    const projectTools = await collectProjectTools(projectId);
     
     // Convert workflow to copilot format with both workflow and project tools
     const wflow = {
         ...current_workflow_config,
-        tools: mergeProjectTools(current_workflow_config.tools, mcpTools)
+        tools: mergeProjectTools(current_workflow_config.tools, projectTools)
     };
 
     // prepare request
@@ -98,12 +98,12 @@ export async function getCopilotAgentInstructions(
     }
 
     // Get MCP tools from project and merge with workflow tools
-    const mcpTools = await fetchProjectMcpTools(projectId);
+    const projectTools = await collectProjectTools(projectId);
     
     // Convert workflow to copilot format with both workflow and project tools
     const wflow = {
         ...current_workflow_config,
-        tools: mergeProjectTools(current_workflow_config.tools, mcpTools)
+        tools: mergeProjectTools(current_workflow_config.tools, projectTools)
     };
 
     // prepare request

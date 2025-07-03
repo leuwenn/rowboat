@@ -54,6 +54,8 @@ services:
       - USE_BILLING=${USE_BILLING}
       - BILLING_API_URL=${BILLING_API_URL}
       - BILLING_API_KEY=${BILLING_API_KEY}
+      - USE_COMPOSIO_TOOLS=${USE_COMPOSIO_TOOLS}
+      - COMPOSIO_API_KEY=${COMPOSIO_API_KEY}
     restart: unless-stopped
     volumes:
       - uploads:/app/uploads

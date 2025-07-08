@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
+import { PictureImg } from '@/components/ui/picture-img';
 import { Wrench } from 'lucide-react';
 import clsx from 'clsx';
 import { Spinner } from '@heroui/react';
@@ -98,13 +99,10 @@ export function ToolkitCard({
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
             {toolkit.meta.logo && (
-              <img 
+              <PictureImg 
                 src={toolkit.meta.logo} 
                 alt={`${toolkit.name} logo`}
                 className="w-8 h-8 rounded-md object-cover"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                }}
               />
             )}
             <div>

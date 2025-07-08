@@ -54,17 +54,17 @@ export function Composio() {
         cursor = response.next_cursor;
       } while (cursor !== null);
       
-      // Only show those toolkits that
-      // - either do not require authentication, OR
-      // - have oauth2 managed by Composio
-      const filteredToolkits = allToolkits.filter(toolkit => {
-        const noAuth = toolkit.no_auth;
-        const hasOAuth2 = toolkit.auth_schemes.includes('OAUTH2');
-        const hasComposioManagedOAuth2 = toolkit.composio_managed_auth_schemes.includes('OAUTH2');
-        return noAuth || hasOAuth2;
-      });
+      // // Only show those toolkits that
+      // // - either do not require authentication, OR
+      // // - have oauth2 managed by Composio
+      // const filteredToolkits = allToolkits.filter(toolkit => {
+      //   const noAuth = toolkit.no_auth;
+      //   const hasOAuth2 = toolkit.auth_schemes.includes('OAUTH2');
+      //   const hasComposioManagedOAuth2 = toolkit.composio_managed_auth_schemes.includes('OAUTH2');
+      //   return noAuth || hasOAuth2;
+      // });
       
-      setToolkits(filteredToolkits);
+      setToolkits(allToolkits);
       setError(null);
     } catch (err: any) {
       setError('Unable to load all Composio toolkits. Please check your connection and try again.');

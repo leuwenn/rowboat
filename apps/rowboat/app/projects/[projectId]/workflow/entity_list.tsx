@@ -8,6 +8,7 @@ import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalList
 import { CSS } from '@dnd-kit/utilities';
 import { Panel } from "@/components/common/panel-common";
 import { Button } from "@/components/ui/button";
+import { PictureImg } from "@/components/ui/picture-img";
 import { clsx } from "clsx";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { ServerLogo } from '../tools/components/MCPServersCommon';
@@ -759,13 +760,10 @@ const ComposioCard = ({
                 <div className="flex items-center gap-1">
                     {card.logo ? (
                         <div className="relative w-4 h-4">
-                            <img
+                            <PictureImg
                                 src={card.logo}
                                 alt={`${card.name} logo`}
                                 className="w-full h-full object-contain rounded"
-                                onError={(e) => {
-                                    e.currentTarget.style.display = 'none';
-                                }}
                             />
                         </div>
                     ) : (
@@ -787,13 +785,10 @@ const ComposioCard = ({
                             icon={
                                 card.logo ? (
                                     <div className="relative w-4 h-4">
-                                        <img
+                                        <PictureImg
                                             src={card.logo}
                                             alt={`${card.name} logo`}
                                             className="w-full h-full object-contain rounded"
-                                            onError={(e) => {
-                                                e.currentTarget.style.display = 'none';
-                                            }}
                                         />
                                     </div>
                                 ) : (

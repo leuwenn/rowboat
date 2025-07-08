@@ -46,7 +46,7 @@ export const ZComposioField = z.object({
     type: z.string(),
     description: z.string(),
     required: z.boolean(),
-    default: z.string().optional(),
+    default: z.string().nullable().optional(),
 });
 
 export const ZGetToolkitResponse = z.object({
@@ -108,7 +108,7 @@ export const ZCreateAuthConfigRequest = z.object({
         }),
         z.object({
             type: z.literal('use_custom_auth'),
-            auth_scheme: ZAuthScheme,
+            authScheme: ZAuthScheme,
             credentials: ZCredentials,
             name: z.string().optional(),
             proxy_config: z.object({

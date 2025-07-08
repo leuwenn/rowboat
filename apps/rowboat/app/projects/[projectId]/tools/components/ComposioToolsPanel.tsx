@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { PictureImg } from '@/components/ui/picture-img';
 import { Checkbox } from '@heroui/react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { listTools } from '@/app/actions/composio_actions';
@@ -156,15 +157,12 @@ export function ComposioToolsPanel({
       title={
         <div className="flex items-center gap-3">
           {toolkit.meta.logo && (
-            <img 
+            <PictureImg 
               src={toolkit.meta.logo} 
               alt={`${toolkit.name} logo`}
               width={24}
               height={24}
               className="rounded-md object-cover"
-              onError={(e) => {
-                e.currentTarget.style.display = 'none';
-              }}
             />
           )}
           <span>{toolkit.name}</span>

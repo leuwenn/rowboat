@@ -94,7 +94,7 @@ export async function createCustomConnectedAccount(projectId: string, request: z
         },
         auth_config: {
             type: 'use_custom_auth',
-            auth_scheme: request.authConfig.authScheme,
+            authScheme: request.authConfig.authScheme,
             credentials: request.authConfig.credentials,
             name: `pid-${projectId}-${Date.now()}`,
         },
@@ -122,6 +122,18 @@ export async function createCustomConnectedAccount(projectId: string, request: z
         },
     });
 
+    // update project with new connected account
+    const key = `composioConnectedAccounts.${request.toolkitSlug}`;
+    const data: z.infer<typeof ComposioConnectedAccount> = {
+        id: response.id,
+        authConfigId: authConfig.auth_config.id,
+        status: 'INITIATED',
+        createdAt: new Date().toISOString(),
+        lastUpdatedAt: new Date().toISOString(),
+    }
+    await projectsCollection.updateOne({ _id: projectId }, { $set: { [key]: data } });
+
+    // return the connected account
     return response;
 }
 

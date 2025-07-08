@@ -61,7 +61,7 @@ export function Composio() {
         const noAuth = toolkit.no_auth;
         const hasOAuth2 = toolkit.auth_schemes.includes('OAUTH2');
         const hasComposioManagedOAuth2 = toolkit.composio_managed_auth_schemes.includes('OAUTH2');
-        return noAuth || (hasOAuth2 && hasComposioManagedOAuth2);
+        return noAuth || hasOAuth2;
       });
       
       setToolkits(filteredToolkits);

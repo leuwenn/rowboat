@@ -76,7 +76,17 @@ export function ToolkitCard({
         const returnUrl = `${window.location.origin}/composio/oauth2/callback`;
         const response = await createOauth2ConnectedAccount(projectId, toolkit.slug, returnUrl);
         console.log(' got conn response', JSON.stringify(response, null, 2));
-        
+
+        // if error, set error
+        if ('error' in response) {
+          if (response.error === 'CUSTOM_OAUTH2_CONFIG_REQUIRED') {
+            setError('Please set up a custom OAuth2 configuration for this toolkit in the Composio dashboard');
+          } else {
+            setError('Failed to connect to toolkit');
+          }
+          return;
+        }
+
         // Open OAuth window
         const authWindow = window.open(
           response.connectionData.val.redirectUrl,

@@ -10,6 +10,7 @@ import {
     ZTool,
     ZListResponse,
     ZCreateConnectedAccountResponse,
+    ZError,
 } from "@/app/lib/composio/composio";
 import { ComposioConnectedAccount } from "@/app/lib/types/project_types";
 import { getProjectConfig, projectAuthCheck } from "./project_actions";
@@ -25,7 +26,7 @@ export async function listTools(projectId: string, toolkitSlug: string, cursor: 
     return await libListTools(toolkitSlug, cursor);
 }
 
-export async function createOauth2ConnectedAccount(projectId: string, toolkitSlug: string, returnUrl: string): Promise<z.infer<typeof ZCreateConnectedAccountResponse>> {
+export async function createOauth2ConnectedAccount(projectId: string, toolkitSlug: string, returnUrl: string): Promise<z.infer<typeof ZCreateConnectedAccountResponse | typeof ZError>> {
     await projectAuthCheck(projectId);
     const project = await getProjectConfig(projectId);
 
@@ -37,6 +38,11 @@ export async function createOauth2ConnectedAccount(projectId: string, toolkitSlu
 
     // create new connected account for this project
     const response = await libCreateOauth2ConnectedAccount(toolkitSlug, project._id, returnUrl);
+
+    // if error, return error
+    if ('error' in response) {
+        return response;
+    }
 
     // update project with new connected account
     const key = `composioConnectedAccounts.${toolkitSlug}`;

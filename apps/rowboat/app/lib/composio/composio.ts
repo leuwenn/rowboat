@@ -112,7 +112,7 @@ export const ZCreateConnectedAccountResponse = z.object({
         authScheme: z.literal('OAUTH2'),
         val: z.object({
             status: z.literal('INITIATED'),
-            code_verifier: z.string(),
+            code_verifier: z.string().optional(),
             redirectUrl: z.string(),
             callback_url: z.string(),
         }),
@@ -146,6 +146,12 @@ const ZErrorResponse = z.object({
         suggested_fix: z.string().nullable(),
         errors: z.array(z.string()).nullable(),
     }),
+});
+
+export const ZError = z.object({
+    error: z.enum([
+        'CUSTOM_OAUTH2_CONFIG_REQUIRED',
+    ]),
 });
 
 export const ZDeleteOperationResponse = z.object({
@@ -250,7 +256,7 @@ export async function createComposioManagedAuthConfig(toolkitSlug: string): Prom
     return results.auth_config;
 }
 
-export async function autocreateOauth2Integration(toolkitSlug: string): Promise<z.infer<typeof ZAuthConfig>> {
+export async function autocreateOauth2Integration(toolkitSlug: string): Promise<z.infer<typeof ZAuthConfig | typeof ZError>> {
     // fetch toolkit
     const toolkit = await getToolkit(toolkitSlug);
 
@@ -270,13 +276,25 @@ export async function autocreateOauth2Integration(toolkitSlug: string): Promise<
         return oauth2AuthConfig;
     }
 
-    // otherwise, we will create a composio managed auth config
-    return await createComposioManagedAuthConfig(toolkitSlug);
+    // check if composio managed oauth2 is supported
+    if (toolkit.composio_managed_auth_schemes.includes('OAUTH2')) {
+        return await createComposioManagedAuthConfig(toolkitSlug);
+    }
+
+    // else return error
+    return {
+        error: 'CUSTOM_OAUTH2_CONFIG_REQUIRED',
+    };
 }
 
-export async function createOauth2ConnectedAccount(toolkitSlug: string, userId: string, callbackUrl: string): Promise<z.infer<typeof ZCreateConnectedAccountResponse>> {
+export async function createOauth2ConnectedAccount(toolkitSlug: string, userId: string, callbackUrl: string): Promise<z.infer<typeof ZCreateConnectedAccountResponse | typeof ZError>> {
     // fetch auth config
     const authConfig = await autocreateOauth2Integration(toolkitSlug);
+
+    // if error, return error
+    if ('error' in authConfig) {
+        return authConfig;
+    }
 
     // create connected account
     const url = new URL(`${BASE_URL}/connected_accounts`);

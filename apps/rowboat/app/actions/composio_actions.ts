@@ -3,22 +3,43 @@ import { z } from "zod";
 import {
     listToolkits as libListToolkits,
     listTools as libListTools,
-    createOauth2ConnectedAccount as libCreateOauth2ConnectedAccount,
     getConnectedAccount as libGetConnectedAccount,
     deleteConnectedAccount as libDeleteConnectedAccount,
+    listAuthConfigs as libListAuthConfigs,
+    createAuthConfig as libCreateAuthConfig,
+    getToolkit as libGetToolkit,
+    createConnectedAccount as libCreateConnectedAccount,
+    getAuthConfig as libGetAuthConfig,
+    deleteAuthConfig as libDeleteAuthConfig,
     ZToolkit,
+    ZGetToolkitResponse,
     ZTool,
     ZListResponse,
     ZCreateConnectedAccountResponse,
-    ZError,
+    ZAuthScheme,
+    ZCredentials,
 } from "@/app/lib/composio/composio";
 import { ComposioConnectedAccount } from "@/app/lib/types/project_types";
 import { getProjectConfig, projectAuthCheck } from "./project_actions";
 import { projectsCollection } from "../lib/mongodb";
 
+const ZCreateCustomConnectedAccountRequest = z.object({
+    toolkitSlug: z.string(),
+    authConfig: z.object({
+        authScheme: ZAuthScheme,
+        credentials: ZCredentials,
+    }),
+    callbackUrl: z.string(),
+});
+
 export async function listToolkits(projectId: string, cursor: string | null = null): Promise<z.infer<ReturnType<typeof ZListResponse<typeof ZToolkit>>>> {
     await projectAuthCheck(projectId);
     return await libListToolkits(cursor);
+}
+
+export async function getToolkit(projectId: string, toolkitSlug: string): Promise<z.infer<typeof ZGetToolkitResponse>> {
+    await projectAuthCheck(projectId);
+    return await libGetToolkit(toolkitSlug);
 }
 
 export async function listTools(projectId: string, toolkitSlug: string, cursor: string | null = null): Promise<z.infer<ReturnType<typeof ZListResponse<typeof ZTool>>>> {
@@ -26,33 +47,80 @@ export async function listTools(projectId: string, toolkitSlug: string, cursor: 
     return await libListTools(toolkitSlug, cursor);
 }
 
-export async function createOauth2ConnectedAccount(projectId: string, toolkitSlug: string, returnUrl: string): Promise<z.infer<typeof ZCreateConnectedAccountResponse | typeof ZError>> {
+export async function createComposioManagedOauth2ConnectedAccount(projectId: string, toolkitSlug: string, callbackUrl: string): Promise<z.infer<typeof ZCreateConnectedAccountResponse>> {
     await projectAuthCheck(projectId);
-    const project = await getProjectConfig(projectId);
 
-    // check if already connected
-    const existingConnectedAccount = project.composioConnectedAccounts?.[toolkitSlug];
-    if (existingConnectedAccount && existingConnectedAccount.status === 'ACTIVE') {
-        throw new Error(`Already connected to ${toolkitSlug}`);
+    // fetch managed auth configs
+    const configs = await libListAuthConfigs(toolkitSlug, null, true);
+
+    // check if managed oauth2 config exists
+    const authConfig = configs.items.find(config => config.auth_scheme === 'OAUTH2' && config.is_composio_managed);
+    if (!authConfig) {
+        throw new Error(`No managed oauth2 auth config found for toolkit ${toolkitSlug}`);
     }
 
-    // create new connected account for this project
-    const response = await libCreateOauth2ConnectedAccount(toolkitSlug, project._id, returnUrl);
-
-    // if error, return error
-    if ('error' in response) {
-        return response;
-    }
+    // create new connected account
+    const response = await libCreateConnectedAccount({
+        auth_config: {
+            id: authConfig.id,
+        },
+        connection: {
+            user_id: projectId,
+            callback_url: callbackUrl,
+        },
+    });
 
     // update project with new connected account
     const key = `composioConnectedAccounts.${toolkitSlug}`;
     const data: z.infer<typeof ComposioConnectedAccount> = {
         id: response.id,
+        authConfigId: authConfig.id,
         status: 'INITIATED',
         createdAt: new Date().toISOString(),
         lastUpdatedAt: new Date().toISOString(),
     }
     await projectsCollection.updateOne({ _id: projectId }, { $set: { [key]: data } });
+
+    return response;
+}
+
+export async function createCustomConnectedAccount(projectId: string, request: z.infer<typeof ZCreateCustomConnectedAccountRequest>): Promise<z.infer<typeof ZCreateConnectedAccountResponse>> {
+    await projectAuthCheck(projectId);
+
+    // first, create the auth config
+    const authConfig = await libCreateAuthConfig({
+        toolkit: {
+            slug: request.toolkitSlug,
+        },
+        auth_config: {
+            type: 'use_custom_auth',
+            auth_scheme: request.authConfig.authScheme,
+            credentials: request.authConfig.credentials,
+            name: `pid-${projectId}-${Date.now()}`,
+        },
+    });
+
+    // then, create the connected account
+    let state = undefined;
+    if (request.authConfig.authScheme !== 'OAUTH2') {
+        state = {
+            authScheme: request.authConfig.authScheme,
+            val: {
+                status: 'ACTIVE' as const,
+                ...request.authConfig.credentials,
+            },
+        };
+    }
+    const response = await libCreateConnectedAccount({
+        auth_config: {
+            id: authConfig.auth_config.id,
+        },
+        connection: {
+            state,
+            user_id: projectId,
+            callback_url: request.callbackUrl,
+        },
+    });
 
     return response;
 }
@@ -107,6 +175,14 @@ export async function deleteConnectedAccount(projectId: string, toolkitSlug: str
 
     // delete the connected account
     await libDeleteConnectedAccount(connectedAccountId);
+
+    // get auth config data
+    const authConfig = await libGetAuthConfig(account.authConfigId);
+
+    // delete the auth config if it is NOT managed by composio
+    if (!authConfig.is_composio_managed) {
+        await libDeleteAuthConfig(account.authConfigId);
+    }
 
     // update project with deleted connected account
     const key = `composioConnectedAccounts.${toolkitSlug}`;

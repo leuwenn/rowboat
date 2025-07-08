@@ -18,6 +18,15 @@ export const ZAuthScheme = z.enum([
     'OAUTH2',
 ]);
 
+export const ZConnectedAccountStatus = z.enum([
+    'INITIALIZING',
+    'INITIATED',
+    'ACTIVE',
+    'FAILED',
+    'EXPIRED',
+    'INACTIVE',
+]);
+
 export const ZToolkit = z.object({
     slug: z.string(),
     name: z.string(),
@@ -31,6 +40,15 @@ export const ZToolkit = z.object({
     composio_managed_auth_schemes: z.array(ZAuthScheme),
 });
 
+export const ZComposioField = z.object({
+    name: z.string(),
+    displayName: z.string(),
+    type: z.string(),
+    description: z.string(),
+    required: z.boolean(),
+    default: z.string().optional(),
+});
+
 export const ZGetToolkitResponse = z.object({
     slug: z.string(),
     name: z.string(),
@@ -38,6 +56,16 @@ export const ZGetToolkitResponse = z.object({
     auth_config_details: z.array(z.object({
         name: z.string(),
         mode: ZAuthScheme,
+        fields: z.object({
+            auth_config_creation: z.object({
+                required: z.array(ZComposioField),
+                optional: z.array(ZComposioField),
+            }),
+            connected_account_initiation: z.object({
+                required: z.array(ZComposioField),
+                optional: z.array(ZComposioField),
+            }),
+        })
     })).nullable(),
 });
 
@@ -65,6 +93,33 @@ export const ZAuthConfig = z.object({
     auth_scheme: ZAuthScheme,
 });
 
+export const ZCredentials = z.record(z.string(), z.union([z.string(), z.number(), z.boolean()]));
+
+export const ZCreateAuthConfigRequest = z.object({
+    toolkit: z.object({
+        slug: z.string(),
+    }),
+    auth_config: z.discriminatedUnion('type', [
+        z.object({
+            type: z.literal('use_composio_managed_auth'),
+            name: z.string().optional(),
+            credentials: ZCredentials.optional(),
+            restrict_to_following_tools: z.array(z.string()).optional(),
+        }),
+        z.object({
+            type: z.literal('use_custom_auth'),
+            auth_scheme: ZAuthScheme,
+            credentials: ZCredentials,
+            name: z.string().optional(),
+            proxy_config: z.object({
+                proxy_url: z.string(),
+                proxy_auth_key: z.string().optional(),
+            }).optional(),
+            restrict_to_following_tools: z.array(z.string()).optional(),
+        }),
+    ]).optional(),
+});
+
 /*
 {
     "toolkit": {
@@ -83,6 +138,25 @@ export const ZCreateAuthConfigResponse = z.object({
         slug: z.string(),
     }),
     auth_config: ZAuthConfig,
+});
+
+const ZConnectionData = z.object({
+    authScheme: ZAuthScheme,
+    val: z.record(z.string(), z.unknown())
+        .and(z.object({
+            status: ZConnectedAccountStatus,
+        })),
+});
+
+export const ZCreateConnectedAccountRequest = z.object({
+    auth_config: z.object({
+        id: z.string(),
+    }),
+    connection: z.object({
+        state: ZConnectionData.optional(),
+        user_id: z.string().optional(),
+        callback_url: z.string().optional(),
+    }),
 });
 
 /*
@@ -108,16 +182,8 @@ export const ZCreateAuthConfigResponse = z.object({
 */
 export const ZCreateConnectedAccountResponse = z.object({
     id: z.string(),
-    connectionData: z.object({
-        authScheme: z.literal('OAUTH2'),
-        val: z.object({
-            status: z.literal('INITIATED'),
-            code_verifier: z.string().optional(),
-            redirectUrl: z.string(),
-            callback_url: z.string(),
-        }),
-    }),
-}); 
+    connectionData: ZConnectionData,
+});
 
 export const ZConnectedAccount = z.object({
     id: z.string(),
@@ -129,15 +195,8 @@ export const ZConnectedAccount = z.object({
         is_composio_managed: z.boolean(),
         is_disabled: z.boolean(),
     }),
-    status: z.enum([
-        'INITIALIZING',
-        'INITIATED',
-        'ACTIVE',
-        'FAILED',
-        'EXPIRED',
-        'INACTIVE',
-    ]),
-}); 
+    status: ZConnectedAccountStatus,
+});
 
 const ZErrorResponse = z.object({
     error: z.object({
@@ -232,86 +291,111 @@ export async function listTools(toolkitSlug: string, cursor: string | null = nul
     return composioApiCall(ZListResponse(ZTool), url.toString());
 }
 
-export async function fetchAuthConfigs(toolkitSlug: string): Promise<z.infer<ReturnType<typeof ZListResponse<typeof ZAuthConfig>>>> {
+export async function listAuthConfigs(toolkitSlug: string, cursor: string | null = null, managedOnly: boolean = false): Promise<z.infer<ReturnType<typeof ZListResponse<typeof ZAuthConfig>>>> {
     const url = new URL(`${BASE_URL}/auth_configs`);
     url.searchParams.set("toolkit_slug", toolkitSlug);
+    if (cursor) {
+        url.searchParams.set("cursor", cursor);
+    }
+    if (managedOnly) {
+        url.searchParams.set("is_composio_managed", "true");
+    }
 
+    // fetch
     return composioApiCall(ZListResponse(ZAuthConfig), url.toString());
 }
 
-export async function createComposioManagedAuthConfig(toolkitSlug: string): Promise<z.infer<typeof ZAuthConfig>> {
+export async function createAuthConfig(request: z.infer<typeof ZCreateAuthConfigRequest>): Promise<z.infer<typeof ZCreateAuthConfigResponse>> {
     const url = new URL(`${BASE_URL}/auth_configs`);
-
-    const results = await composioApiCall(ZCreateAuthConfigResponse, url.toString(), {
+    return composioApiCall(ZCreateAuthConfigResponse, url.toString(), {
         method: 'POST',
-        body: JSON.stringify({
-            toolkit: {
-                slug: toolkitSlug,
-            },
-            auth_config: {
-                type: 'use_composio_managed_auth',
-            },
-        }),
+        body: JSON.stringify(request),
     });
-    return results.auth_config;
 }
 
-export async function autocreateOauth2Integration(toolkitSlug: string): Promise<z.infer<typeof ZAuthConfig | typeof ZError>> {
-    // fetch toolkit
-    const toolkit = await getToolkit(toolkitSlug);
-
-    // ensure oauth2 is supported
-    if (!toolkit.auth_config_details?.some(config => config.mode === 'OAUTH2')) {
-        throw new Error(`OAuth2 is not supported for toolkit ${toolkitSlug}`);
-    }
-
-    // fetch existing auth configs
-    const authConfigs = await fetchAuthConfigs(toolkitSlug);
-
-    // find a valid oauth2 config
-    const oauth2AuthConfig = authConfigs.items.find(config => config.auth_scheme === 'OAUTH2');
-
-    // if valid auth config, return it
-    if (oauth2AuthConfig) {
-        return oauth2AuthConfig;
-    }
-
-    // check if composio managed oauth2 is supported
-    if (toolkit.composio_managed_auth_schemes.includes('OAUTH2')) {
-        return await createComposioManagedAuthConfig(toolkitSlug);
-    }
-
-    // else return error
-    return {
-        error: 'CUSTOM_OAUTH2_CONFIG_REQUIRED',
-    };
+export async function getAuthConfig(authConfigId: string): Promise<z.infer<typeof ZAuthConfig>> {
+    const url = new URL(`${BASE_URL}/auth_configs/${authConfigId}`);
+    return composioApiCall(ZAuthConfig, url.toString());
 }
 
-export async function createOauth2ConnectedAccount(toolkitSlug: string, userId: string, callbackUrl: string): Promise<z.infer<typeof ZCreateConnectedAccountResponse | typeof ZError>> {
-    // fetch auth config
-    const authConfig = await autocreateOauth2Integration(toolkitSlug);
+export async function deleteAuthConfig(authConfigId: string): Promise<z.infer<typeof ZDeleteOperationResponse>> {
+    const url = new URL(`${BASE_URL}/auth_configs/${authConfigId}`);
+    return composioApiCall(ZDeleteOperationResponse, url.toString(), {
+        method: 'DELETE',
+    });
+}
 
-    // if error, return error
-    if ('error' in authConfig) {
-        return authConfig;
-    }
+// export async function createComposioManagedOauth2AuthConfig(toolkitSlug: string): Promise<z.infer<typeof ZAuthConfig>> {
+//     const response = await createAuthConfig({
+//         toolkit: {
+//             slug: toolkitSlug,
+//         },
+//         auth_config: {
+//             type: 'use_composio_managed_auth',
+//         },
+//     });
+//     return response.auth_config;
+// }
 
-    // create connected account
+// export async function autocreateOauth2Integration(toolkitSlug: string): Promise<z.infer<typeof ZAuthConfig | typeof ZError>> {
+//     // fetch toolkit
+//     const toolkit = await getToolkit(toolkitSlug);
+
+//     // ensure oauth2 is supported
+//     if (!toolkit.auth_config_details?.some(config => config.mode === 'OAUTH2')) {
+//         throw new Error(`OAuth2 is not supported for toolkit ${toolkitSlug}`);
+//     }
+
+//     // fetch existing auth configs
+//     const authConfigs = await fetchAuthConfigs(toolkitSlug);
+
+//     // find a valid oauth2 config
+//     const oauth2AuthConfig = authConfigs.items.find(config => config.auth_scheme === 'OAUTH2');
+
+//     // if valid auth config, return it
+//     if (oauth2AuthConfig) {
+//         return oauth2AuthConfig;
+//     }
+
+//     // check if composio managed oauth2 is supported
+//     if (toolkit.composio_managed_auth_schemes.includes('OAUTH2')) {
+//         return await createComposioManagedOauth2AuthConfig(toolkitSlug);
+//     }
+
+//     // else return error
+//     return {
+//         error: 'CUSTOM_OAUTH2_CONFIG_REQUIRED',
+//     };
+// }
+
+export async function createConnectedAccount(request: z.infer<typeof ZCreateConnectedAccountRequest>): Promise<z.infer<typeof ZCreateConnectedAccountResponse>> {
     const url = new URL(`${BASE_URL}/connected_accounts`);
-
     return composioApiCall(ZCreateConnectedAccountResponse, url.toString(), {
         method: 'POST',
-        body: JSON.stringify({
-            auth_config: {
-                id: authConfig.id,
-            },
-            connection: {
-                user_id: userId,
-                callback_url: callbackUrl,
-            },
-        }),
+        body: JSON.stringify(request),
     });
 }
+
+// export async function createOauth2ConnectedAccount(toolkitSlug: string, userId: string, callbackUrl: string): Promise<z.infer<typeof ZCreateConnectedAccountResponse | typeof ZError>> {
+//     // fetch auth config
+//     const authConfig = await autocreateOauth2Integration(toolkitSlug);
+
+//     // if error, return error
+//     if ('error' in authConfig) {
+//         return authConfig;
+//     }
+
+//     // create connected account
+//     return await createConnectedAccount({
+//         auth_config: {
+//             id: authConfig.id,
+//         },
+//         connection: {
+//             user_id: userId,
+//             callback_url: callbackUrl,
+//         },
+//     });
+// }
 
 export async function getConnectedAccount(connectedAccountId: string): Promise<z.infer<typeof ZConnectedAccount>> {
     const url = new URL(`${BASE_URL}/connected_accounts/${connectedAccountId}`);

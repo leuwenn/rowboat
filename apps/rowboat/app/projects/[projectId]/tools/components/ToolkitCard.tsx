@@ -6,7 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import { Wrench } from 'lucide-react';
 import clsx from 'clsx';
 import { Spinner } from '@heroui/react';
-import { createOauth2ConnectedAccount, deleteConnectedAccount, syncConnectedAccount } from '@/app/actions/composio_actions';
+import { createComposioManagedOauth2ConnectedAccount, deleteConnectedAccount, syncConnectedAccount } from '@/app/actions/composio_actions';
 import { z } from 'zod';
 import { ZToolkit } from '@/app/lib/composio/composio';
 import { Project } from '@/app/lib/types/project_types';
@@ -74,7 +74,7 @@ export function ToolkitCard({
       if (newState) {
         // Start OAuth flow
         const returnUrl = `${window.location.origin}/composio/oauth2/callback`;
-        const response = await createOauth2ConnectedAccount(projectId, toolkit.slug, returnUrl);
+        const response = await createComposioManagedOauth2ConnectedAccount(projectId, toolkit.slug, returnUrl);
         console.log(' got conn response', JSON.stringify(response, null, 2));
 
         // if error, set error

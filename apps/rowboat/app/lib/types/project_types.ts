@@ -5,6 +5,7 @@ import { ZTool } from "../composio/composio";
 
 export const ComposioConnectedAccount = z.object({
     id: z.string(),
+    authConfigId: z.string(),
     status: z.enum([
         'INITIATED',
         'ACTIVE',

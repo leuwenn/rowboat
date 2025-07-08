@@ -6,10 +6,11 @@ import { Switch } from '@/components/ui/switch';
 import { Wrench } from 'lucide-react';
 import clsx from 'clsx';
 import { Spinner } from '@heroui/react';
-import { createComposioManagedOauth2ConnectedAccount, deleteConnectedAccount, syncConnectedAccount } from '@/app/actions/composio_actions';
+import { deleteConnectedAccount } from '@/app/actions/composio_actions';
 import { z } from 'zod';
 import { ZToolkit } from '@/app/lib/composio/composio';
 import { Project } from '@/app/lib/types/project_types';
+import { ToolkitAuthModal } from './ToolkitAuthModal';
 
 type ToolkitType = z.infer<typeof ZToolkit>;
 type ProjectType = z.infer<typeof Project>;
@@ -48,96 +49,21 @@ export function ToolkitCard({
 }: ToolkitCardProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const handleOAuthCompletion = useCallback(async (connectedAccountId: string) => {
-    try {
-      // Sync the connected account to get the latest status
-      console.log(' syncing conn', connectedAccountId);
-      await syncConnectedAccount(projectId, toolkit.slug, connectedAccountId);
-      
-      // Update project config in parent
-      onProjectConfigUpdate();
-    } catch (error) {
-      console.error('Error syncing connected account after OAuth:', error);
-      setError('Authentication completed but failed to sync status. Please refresh and try again.');
-    }
-  }, [projectId, toolkit.slug, onProjectConfigUpdate]);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   const handleToggleConnection = useCallback(async () => {
     const newState = !isConnected;
     
     // Clear any previous error when starting a new operation
     setError(null);
-    setIsProcessing(true);
 
-    try {
-      if (newState) {
-        // Start OAuth flow
-        const returnUrl = `${window.location.origin}/composio/oauth2/callback`;
-        const response = await createComposioManagedOauth2ConnectedAccount(projectId, toolkit.slug, returnUrl);
-        console.log(' got conn response', JSON.stringify(response, null, 2));
-
-        // if error, set error
-        if ('error' in response) {
-          if (response.error === 'CUSTOM_OAUTH2_CONFIG_REQUIRED') {
-            setError('Please set up a custom OAuth2 configuration for this toolkit in the Composio dashboard');
-          } else {
-            setError('Failed to connect to toolkit');
-          }
-          return;
-        }
-
-        // Open OAuth window
-        const authWindow = window.open(
-          response.connectionData.val.redirectUrl,
-          '_blank',
-          'width=600,height=700'
-        );
-
-        if (authWindow) {
-          // Use postMessage since we control the callback URL
-          const handleMessage = (event: MessageEvent) => {
-            // Only accept messages from our own origin
-            if (event.origin !== window.location.origin) {
-              return;
-            }
-            
-            // Check if this is an OAuth completion message
-            if (event.data && event.data.type === 'OAUTH_COMPLETE') {
-              window.removeEventListener('message', handleMessage);
-              clearInterval(checkInterval);
-              
-              if (event.data.success) {
-                // Handle successful OAuth completion
-                handleOAuthCompletion(response.id);
-              } else {
-                // Handle OAuth error
-                const errorMessage = event.data.errorDescription || event.data.error || 'OAuth authentication failed';
-                setError(errorMessage);
-              }
-            }
-          };
-          
-          // Listen for postMessage from our callback page
-          window.addEventListener('message', handleMessage);
-          
-          // Minimal fallback: check if window closes without message
-          const checkInterval = setInterval(() => {
-            if (authWindow.closed) {
-              clearInterval(checkInterval);
-              window.removeEventListener('message', handleMessage);
-              
-              // If we didn't get a postMessage, still try to sync
-              // (in case the message was missed for some reason)
-              handleOAuthCompletion(response.id);
-            }
-          }, 1000); // Check less frequently since we expect postMessage
-        } else {
-          window.alert('Failed to open authentication window. Please check your popup blocker settings.');
-          setError('Failed to open authentication window');
-        }
-      } else {
-        // Disconnect - remove the connected account
+    if (newState) {
+      // Show authentication modal
+      setShowAuthModal(true);
+    } else {
+      // Disconnect - remove the connected account
+      setIsProcessing(true);
+      try {
         if (connectedAccountId) {
           await deleteConnectedAccount(projectId, toolkit.slug, connectedAccountId);
           onProjectConfigUpdate();
@@ -146,15 +72,20 @@ export function ToolkitCard({
           // Fallback: just refresh the project config
           onProjectConfigUpdate();
         }
+      } catch (err: any) {
+        console.error('Disconnect failed:', err);
+        const errorMessage = err.message || 'Failed to disconnect toolkit';
+        setError(errorMessage);
+      } finally {
+        setIsProcessing(false);
       }
-    } catch (err: any) {
-      console.error('Toggle connection failed:', err);
-      const errorMessage = err.message || 'Failed to connect to toolkit';
-      setError(errorMessage);
-    } finally {
-      setIsProcessing(false);
     }
-  }, [projectId, toolkit.slug, isConnected, connectedAccountId, onProjectConfigUpdate, onRemoveToolkitTools, handleOAuthCompletion]);
+  }, [projectId, toolkit.slug, isConnected, connectedAccountId, onProjectConfigUpdate, onRemoveToolkitTools]);
+
+  const handleAuthComplete = useCallback(() => {
+    // Update project config when authentication completes
+    onProjectConfigUpdate();
+  }, [onProjectConfigUpdate]);
 
   // Calculate selected tools count for this toolkit
   const selectedToolsCount = projectConfig?.composioSelectedTools?.filter(tool => 
@@ -277,6 +208,15 @@ export function ToolkitCard({
           </div>
         </div>
       </div>
+      
+      <ToolkitAuthModal
+        key={toolkit.slug}
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        toolkitSlug={toolkit.slug}
+        projectId={projectId}
+        onComplete={handleAuthComplete}
+      />
     </div>
   );
 } 

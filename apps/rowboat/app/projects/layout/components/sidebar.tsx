@@ -15,8 +15,7 @@ import {
   Moon,
   Sun,
   HelpCircle,
-  Plus,
-  FolderIcon
+  Plus
 } from "lucide-react";
 import { getProjectConfig, createProject } from "@/app/actions/project_actions";
 import { useTheme } from "@/app/providers/theme-provider";
@@ -119,12 +118,6 @@ export default function Sidebar({ projectId, useAuth, collapsed = false, onToggl
       href: '/projects?section=build',
       label: 'Build Assistant',
       icon: Plus,
-      requiresProject: false
-    },
-    {
-      href: '/projects?section=my-assistants',
-      label: 'My Assistants',
-      icon: FolderIcon,
       requiresProject: false
     }
   ];

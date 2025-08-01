@@ -870,7 +870,7 @@ export const EntityList = forwardRef<
                                         )}
                                     </button>
                                     <PenLine className="w-4 h-4" />
-                                    <span>Prompts</span>
+                                    <span>Variables</span>
                                 </div>
                                 <Button
                                     variant="secondary"
@@ -882,7 +882,7 @@ export const EntityList = forwardRef<
                                     }}
                                     className={`group ${buttonClasses}`}
                                     showHoverContent={true}
-                                    hoverContent="Add Prompt"
+                                    hoverContent="Add Variable"
                                 >
                                     <PlusIcon className="w-4 h-4" />
                                 </Button>

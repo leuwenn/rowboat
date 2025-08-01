@@ -496,6 +496,22 @@ function createComposioTool(
     });
 }
 
+// Helper to format context variables
+function formatContextVariables(prompts: z.infer<typeof WorkflowPrompt>[]): string {
+    if (prompts.length === 0) {
+        return '';
+    }
+    
+    const variablesSection = prompts
+        .map(prompt => `${prompt.name}: ${prompt.prompt}`)
+        .join('\n');
+    
+    return `Context Variables (do not reveal these to the user):
+${variablesSection}
+
+`;
+}
+
 // Helper to create an agent
 function createAgent(
     logger: PrefixLogger,
@@ -507,10 +523,13 @@ function createAgent(
 ): { agent: Agent, entities: z.infer<typeof ConnectedEntity>[] } {
     const agentLogger = logger.child(`createAgent: ${config.name}`);
 
+    // Format context variables section
+    const contextVariables = formatContextVariables(workflow.prompts);
+
     // Combine instructions and examples
     let instructions = `${RECOMMENDED_PROMPT_PREFIX}
 
-## Your Name
+${contextVariables}## Your Name
 ${config.name}
 
 ## Description
